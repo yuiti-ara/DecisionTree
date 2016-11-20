@@ -50,64 +50,39 @@ def entropy(series):
     return h
 
 
-def information_gain(df, target, attr):
+def info_gain(df, target, attr):
 
     # compute entropy before
-    H = entropy(df[target])
+    before = entropy(df[target])
 
-    # compute sum of entropy on each attribute value
+    # compute entropy given target value on each subset
+    series = df[attr]
     entropies = []
-    for value in df[attr].unique():
+    for value in series.unique():
 
         # compute subset given atrribute value
-        cond = df[attr] == value
-        subset = df[cond]
+        subset = df[series == value]
 
         # compute attribute value weight
-        weight = len(subset) / len(df)
+        weight = len(subset) / len(series)
 
-        # compute weighted subset entropy
+        # compute weighted subset entropy on target values
         h = weight * entropy(subset[target])
 
         # store entropy
         entropies.append(h)
 
     # compute information gain
-    ig = H - sum(entropies)
+    ig = before - sum(entropies)
 
     return ig
 
 
-def intrinsic_value(df, attr):
-
-    # for each unique value on given attribute
-    ivs = []
-    for value in df[attr].unique():
-
-        # compute subset given atrribute value
-        cond = df[attr] == value
-        subset = df[cond]
-
-        # compute subset weight
-        weight = len(subset) / len(df)
-
-        # add to the intrinsic value
-        aux = weight * math.log(weight, 2)
-
-        # store
-        ivs.append(aux)
-
-    # compute intrinsic value
-    iv = - sum(ivs)
-
-    return iv
-
-
-def gain_ratio(df, target, attr):
+def info_gain_ratio(df, target, attr):
 
     # compute information-gain & intrinsic value
-    ig = information_gain(df, target, attr)
-    iv = intrinsic_value(df, attr)
+    ig = info_gain(df, target, attr)
+    iv = entropy(df[attr])
 
     # compute ratio
     ratio = ig / iv
@@ -124,7 +99,7 @@ def main():
 
     # compute information gain on given attribute
     for attr in df:
-        ratio = gain_ratio(df, target, attr)
+        ratio = info_gain_ratio(df, target, attr)
         print(ratio)
 
 
