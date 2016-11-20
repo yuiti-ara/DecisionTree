@@ -39,10 +39,10 @@ class DecicionTrees:
         # return tree-root
 
 
-def entropy(df, target):
+def entropy(series):
 
-    # compute target value frequencies
-    probs = df[target].value_counts() / len(df)
+    # compute unique values frequencies
+    probs = series.value_counts() / len(series)
 
     # compute entropy
     h = - sum([p * math.log(p, 2) for p in probs])
@@ -53,7 +53,7 @@ def entropy(df, target):
 def information_gain(df, target, attr):
 
     # compute entropy before
-    H = entropy(df, target)
+    H = entropy(df[target])
 
     # compute sum of entropy on each attribute value
     entropies = []
@@ -67,7 +67,7 @@ def information_gain(df, target, attr):
         weight = len(subset) / len(df)
 
         # compute weighted subset entropy
-        h = weight * entropy(subset, target)
+        h = weight * entropy(subset[target])
 
         # store entropy
         entropies.append(h)
@@ -80,7 +80,7 @@ def information_gain(df, target, attr):
 
 def intrinsic_value(df, attr):
 
-    # compute intrinsic value
+    # for each unique value on given attribute
     ivs = []
     for value in df[attr].unique():
 
