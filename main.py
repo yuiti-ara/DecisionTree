@@ -1,8 +1,10 @@
 # standard library
+from collections import deque
 import math
 
 # external packages
 import networkx as nx
+import matplotlib.pyplot as plt
 import pandas as pd
 from PIL import Image
 
@@ -92,16 +94,23 @@ def info_gain_ratio(df, target, attr):
 
 def main():
 
-    # load data & define target variable
-    df = pd.read_csv("playtennis.csv")
-    target = "play"
-    print(df)
+    # # load data & define target variable
+    # df = pd.read_csv("playtennis.csv")
+    # target = "play"
+    # print(df)
 
-    # compute information gain on given attribute
-    for attr in df:
-        ratio = info_gain_ratio(df, target, attr)
-        print(ratio)
+    tree = nx.DiGraph()
+    tree.add_node("root")
 
+    queue = deque(["root"])
+    for lvl in (2**i for i in range(1, 10+1)):
+
+        node = queue.popleft()
+        for idx in range(lvl, lvl+2):
+            queue.append(str(idx))
+            tree.add_edge(node, str(idx))
+
+    draw(tree)
 
 if __name__ == "__main__":
     main()
