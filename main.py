@@ -3,43 +3,11 @@ from collections import deque
 import math
 
 # external packages
-import networkx as nx
-import matplotlib.pyplot as plt
 import pandas as pd
-from PIL import Image
 
 
-def draw(graphx):
-
-    # write into pydot language, save to image file
-    p = nx.drawing.nx_pydot.to_pydot(graphx)
-    p.write_png("test.png")
-
-    # open image file
-    img = Image.open("test.png")
-    img.show()
-
-
-class DecicionTrees:
-
-    @staticmethod
-    def train(data):
-        pass
-
-        # insert tree-root on the queue
-
-        # while still queue
-
-            # pop a tree node
-
-            # select best attribute to split - split_on(X)
-
-            # add node childs to the tree - split(node, attribute)
-
-            # push the child-nodes to the queue
-
-        # return tree-root
-
+class DecicionTree:
+    pass
 
 def entropy(series):
 
@@ -92,25 +60,84 @@ def info_gain_ratio(df, target, attr):
     return ratio
 
 
+def split_on(df, target):
+
+    best_attr = ""
+    best_ig = 0
+    for attr in df:
+
+        # skip target column
+        if attr == target:
+            continue
+
+        # check gain-ratio
+        ig = info_gain_ratio(df, target, attr)
+        if ig > best_ig:
+            best_attr, best_ig = attr, ig
+
+    return best_attr
+
+
+def splits(df, attr, target):
+
+    # pick atrribute values
+    values = df[attr].unique()
+
+    # for each value, build leaf
+    sub_tree = {}
+    for value in values:
+
+        # pick subset
+        subset = df[df[attr] == value]
+
+        # drop attribute
+        subset = subset.drop(attr, axis=1)
+
+        # check if pure
+        domain = subset[target].unique()
+        is_pure = len(domain) == 1
+
+        # grow tree
+        sub_tree[value] = domain[0] if is_pure else subset
+
+    return {attr: sub_tree}
+
+
+def train(df, target):
+
+    tree = {"root": {}}
+    queue = deque([(tree, "root", df)])
+    while queue:
+
+        # pick leaf
+        subtree, label, df = queue.popleft()
+
+        if type(df) != pd.DataFrame:
+            continue
+
+        # pick attribute to split
+        attr = split_on(df, target)
+
+        # grow tree
+        subtree[label] = splits(df, attr, target)
+
+        for value, subset in subtree[label][attr].items():
+            queue.append((subtree[label][attr], value, subset))
+
+    return tree["root"]
+
+
 def main():
 
-    # # load data & define target variable
-    # df = pd.read_csv("playtennis.csv")
-    # target = "play"
-    # print(df)
+    # load data & define target variable
+    df = pd.read_csv("playtennis.csv")
+    target = "play"
 
-    tree = nx.DiGraph()
-    tree.add_node("root")
+    tree = train(df, target)
 
-    queue = deque(["root"])
-    for lvl in (2**i for i in range(1, 10+1)):
+    from pprint import pprint
+    pprint(tree)
 
-        node = queue.popleft()
-        for idx in range(lvl, lvl+2):
-            queue.append(str(idx))
-            tree.add_edge(node, str(idx))
-
-    draw(tree)
 
 if __name__ == "__main__":
     main()
