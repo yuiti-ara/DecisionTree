@@ -6,125 +6,167 @@ import math
 import pandas as pd
 
 
+class Tree:
+    def __init__(self, df):
+        self.df = df
+        self.attr = None
+        self.nodes = {}
+
+
 class DecicionTree:
-    pass
 
-def entropy(series):
+    @staticmethod
+    def entropy(series):
 
-    # compute unique values frequencies
-    probs = series.value_counts() / len(series)
+        # compute unique values frequencies
+        probs = series.value_counts() / len(series)
 
-    # compute entropy
-    h = - sum([p * math.log(p, 2) for p in probs])
+        # compute entropy
+        h = - sum([p * math.log(p, 2) for p in probs])
 
-    return h
+        return h
 
+    @classmethod
+    def info_gain(cls, df, target, attr):
 
-def info_gain(df, target, attr):
+        # compute entropy before
+        before = cls.entropy(df[target])
 
-    # compute entropy before
-    before = entropy(df[target])
+        # compute entropy given target value on each subset
+        series = df[attr]
+        entropies = []
+        for value in series.unique():
 
-    # compute entropy given target value on each subset
-    series = df[attr]
-    entropies = []
-    for value in series.unique():
+            # compute subset given atrribute value
+            subset = df[series == value]
 
-        # compute subset given atrribute value
-        subset = df[series == value]
+            # compute attribute value weight
+            weight = len(subset) / len(series)
 
-        # compute attribute value weight
-        weight = len(subset) / len(series)
+            # compute weighted subset entropy on target values
+            h = weight * cls.entropy(subset[target])
 
-        # compute weighted subset entropy on target values
-        h = weight * entropy(subset[target])
+            # store entropy
+            entropies.append(h)
 
-        # store entropy
-        entropies.append(h)
+        # compute information gain
+        ig = before - sum(entropies)
 
-    # compute information gain
-    ig = before - sum(entropies)
+        return ig
 
-    return ig
+    @classmethod
+    def info_gain_ratio(cls, df, target, attr):
 
+        # compute information-gain & intrinsic value
+        ig = cls.info_gain(df, target, attr)
+        iv = cls.entropy(df[attr])
 
-def info_gain_ratio(df, target, attr):
+        # compute ratio
+        ratio = ig / iv
 
-    # compute information-gain & intrinsic value
-    ig = info_gain(df, target, attr)
-    iv = entropy(df[attr])
+        return ratio
 
-    # compute ratio
-    ratio = ig / iv
+    @classmethod
+    def split_on(cls, df, target):
 
-    return ratio
+        best_attr = ""
+        best_ig = 0
+        for attr in df:
 
+            # skip target column
+            if attr == target:
+                continue
 
-def split_on(df, target):
+            # check gain-ratio
+            ig = cls.info_gain_ratio(df, target, attr)
+            if ig > best_ig:
+                best_attr, best_ig = attr, ig
 
-    best_attr = ""
-    best_ig = 0
-    for attr in df:
+        return best_attr
 
-        # skip target column
-        if attr == target:
-            continue
+    @staticmethod
+    def splits(df, attr, target):
 
-        # check gain-ratio
-        ig = info_gain_ratio(df, target, attr)
-        if ig > best_ig:
-            best_attr, best_ig = attr, ig
+        # pick atrribute values
+        values = df[attr].unique()
 
-    return best_attr
+        # for each value, build leaf
+        nodes = {}
+        for value in values:
 
+            # pick subset
+            subset = df[df[attr] == value]
 
-def splits(df, attr, target):
+            # drop attribute
+            subset = subset.drop(attr, axis=1)
 
-    # pick atrribute values
-    values = df[attr].unique()
+            # check if pure
+            domain = subset[target].unique()
+            is_pure = len(domain) == 1
 
-    # for each value, build leaf
-    sub_tree = {}
-    for value in values:
+            # grow tree
+            nodes[value] = domain[0] if is_pure else Tree(subset)
 
-        # pick subset
-        subset = df[df[attr] == value]
+        return nodes
 
-        # drop attribute
-        subset = subset.drop(attr, axis=1)
+    @classmethod
+    def train(cls, df, target):
 
-        # check if pure
-        domain = subset[target].unique()
-        is_pure = len(domain) == 1
+        tree = Tree(df)
+        queue = deque([tree])
+        while queue:
 
-        # grow tree
-        sub_tree[value] = domain[0] if is_pure else subset
+            # pick node
+            root = queue.popleft()
 
-    return {attr: sub_tree}
+            # pick attribute to split
+            attr = cls.split_on(root.df, target)
 
+            # split into child-nodes
+            nodes = cls.splits(root.df, attr, target)
 
-def train(df, target):
+            # update node
+            root.attr = attr
+            root.nodes = nodes
 
-    tree = {"root": {}}
-    queue = deque([(tree, "root", df)])
-    while queue:
+            # enqueue leafs
+            for node in nodes.values():
 
-        # pick leaf
-        subtree, label, df = queue.popleft()
+                # skip pure leafs
+                if type(node) != Tree:
+                    continue
+                queue.append(node)
 
-        if type(df) != pd.DataFrame:
-            continue
+        return tree
 
-        # pick attribute to split
-        attr = split_on(df, target)
+    @staticmethod
+    def print(tree):
 
-        # grow tree
-        subtree[label] = splits(df, attr, target)
+        queue = deque([tree])
+        while queue:
 
-        for value, subset in subtree[label][attr].items():
-            queue.append((subtree[label][attr], value, subset))
+            # pick node
+            root = queue.popleft()
+            if type(root) == str:
+                print(root)
+            else:
+                print(root.attr, root.nodes.keys())
 
-    return tree["root"]
+            # enqueue leafs
+            if type(root) == str:
+                continue
+            for node in root.nodes.values():
+                # skip pure leafs
+                queue.append(node)
+            print("new lvl\n")
+
+    @staticmethod
+    def inference(root, values):
+
+        while root:
+            if type(root) == str:
+                return root
+            root = root.nodes[values[root.attr]]
 
 
 def main():
@@ -133,10 +175,16 @@ def main():
     df = pd.read_csv("playtennis.csv")
     target = "play"
 
-    tree = train(df, target)
+    tree = DecicionTree.train(df, target)
+    #DecicionTree.print(tree)
 
-    from pprint import pprint
-    pprint(tree)
+    test = {"outlook": "sunny",
+            "temp": "hot",
+            "humidity": "normal",
+            "windy": False}
+
+    result = DecicionTree.inference(tree, test)
+    print(result)
 
 
 if __name__ == "__main__":
