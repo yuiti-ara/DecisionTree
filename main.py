@@ -40,7 +40,7 @@ class Tree:
 
         root = self
         while root:
-            if len(root.probs) == 1:
+            if not root.nodes:
                 return root.probs
             root = root.nodes[values[root.attr]]
 
@@ -178,12 +178,12 @@ def main():
 
     tree.print_bfs()
 
-    # test = {"outlook": "sunny",
-    #         "temp": "hot",
-    #         "humidity": "normal",
-    #         "windy": False}
-    # result = tree.inference(test)
-    # print(result)
+    test = {"outlook": "sunny",
+            "temp": "hot",
+            "humidity": "normal",
+            "windy": False}
+    result = tree.inference(test)
+    print(result)
 
 
 if __name__ == "__main__":
