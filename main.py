@@ -63,7 +63,7 @@ class DecicionTree:
     @staticmethod
     def entropy(series):
 
-        # compute unique values frequencies
+        # compute unique values probabilities
         probs = series.value_counts() / len(series)
 
         # compute entropy
