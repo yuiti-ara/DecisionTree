@@ -78,8 +78,8 @@ class DecicionTree:
         before = cls.entropy(df[target])
 
         # pick subset for each attribute value
-        values = df[attr]
-        subsets = (df[values == value] for value in values.unique())
+        series = df[attr]
+        subsets = (df[series == value] for value in series.unique())
 
         # compute each weighted subset entropy given target variable
         entropies = (len(subset) * cls.entropy(subset[target]) for subset in subsets)
@@ -126,11 +126,11 @@ class DecicionTree:
 
         # pick data subset with each attribute value
         subsets = {}
-        values = df[attr]
-        for value in values.unique():
+        series = df[attr]
+        for value in series.unique():
 
             # pick subset
-            subset = df[values == value]
+            subset = df[series == value]
 
             # drop attribute
             subset = subset.drop(attr, axis=1)
