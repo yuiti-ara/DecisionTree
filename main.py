@@ -126,11 +126,11 @@ class DecicionTree:
 
         # pick data subset with each attribute value
         subsets = {}
-        values = df[attr].unique()
-        for value in values:
+        values = df[attr]
+        for value in values.unique():
 
             # pick subset
-            subset = df[df[attr] == value]
+            subset = df[values == value]
 
             # drop attribute
             subset = subset.drop(attr, axis=1)
