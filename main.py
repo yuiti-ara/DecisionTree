@@ -7,7 +7,7 @@ import pandas as pd
 
 
 class Tree:
-    def __init__(self, attr, series):
+    def __init__(self, series, attr):
 
         # target attribute distribution & name
         probs = series.value_counts(normalize=True)
@@ -132,7 +132,7 @@ class DecicionTree:
         subsets = cls.splits(df, attr)
 
         # create tree-node
-        root = Tree(attr, df[target])
+        root = Tree(df[target], attr)
 
         # add child-nodes
         root.nodes = {value: cls.grow(subset, target) for value, subset in subsets.items()}
