@@ -7,34 +7,16 @@ import pandas as pd
 
 
 class Tree:
-    def __init__(self, df):
+    def __init__(self, attr, series):
 
-        # dataset
-        self.df = df
-
-        # target variable name & distribution
-        self.target = None
-        self.probs = {}
-
-        # decision attribute name & child-nodes for its values
-        self.attr = None
-        self.nodes = {}
-
-    def update(self, attr, subsets, target):
-
-        # compute target variable distribution
-        series = self.df[target]
-        probs = series.value_counts() / len(series)
-
-        # create child-nodes
-        nodes = {value: Tree(subset) for value, subset in subsets.items()}
-
-        # update node
-        self.df = None
-        self.target = target
+        # target attribute distribution & name
+        probs = series.value_counts(normalize=True)
         self.probs = probs.to_dict()
+        self.target = series.name
+
+        # decision attribute name & empty child nodes
         self.attr = attr if attr else "pure"
-        self.nodes = nodes
+        self.nodes = {}
 
     def inference(self, values):
 
@@ -64,7 +46,7 @@ class DecicionTree:
     def entropy(series):
 
         # compute unique values probabilities
-        probs = series.value_counts() / len(series)
+        probs = series.value_counts(normalize=True)
 
         # compute entropy
         h = - sum([p * math.log(p, 2) for p in probs])
@@ -141,31 +123,21 @@ class DecicionTree:
         return subsets
 
     @classmethod
-    def grow(cls, root, target):
+    def grow(cls, df, target):
 
         # pick attribute to split
-        attr = cls.split_on(root.df, target)
+        attr = cls.split_on(df, target)
 
         # split data into subsets
-        subsets = cls.splits(root.df, attr)
+        subsets = cls.splits(df, attr)
 
-        # update current node
-        root.update(attr, subsets, target)
+        # create tree-node
+        root = Tree(attr, df[target])
 
-        # grow each child-node
-        for node in root.nodes.values():
-            cls.grow(node, target)
+        # add child-nodes
+        root.nodes = {value: cls.grow(subset, target) for value, subset in subsets.items()}
 
-    @classmethod
-    def get(cls, df, target):
-
-        # define tree root
-        tree = Tree(df)
-
-        # grow tree from root
-        cls.grow(tree, target)
-
-        return tree
+        return root
 
 
 def main():
@@ -174,16 +146,16 @@ def main():
     df = pd.read_csv("playtennis.csv")
     target = "play"
 
-    tree = DecicionTree.get(df, target)
+    tree = DecicionTree.grow(df, target)
 
     tree.print_bfs()
 
-    test = {"outlook": "sunny",
-            "temp": "hot",
-            "humidity": "normal",
-            "windy": False}
-    result = tree.inference(test)
-    print(result)
+    # test = {"outlook": "sunny",
+    #         "temp": "hot",
+    #         "humidity": "normal",
+    #         "windy": False}
+    # result = tree.inference(test)
+    # print(result)
 
 
 if __name__ == "__main__":
