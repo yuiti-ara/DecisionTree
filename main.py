@@ -4,6 +4,7 @@ import math
 
 # external packages
 import pandas as pd
+import numpy as np
 
 
 class Tree:
@@ -140,15 +141,26 @@ class DecicionTree:
         return root
 
 
+def entropy(y):
+
+    # compute value distribution
+    _, counts = np.unique(y, return_counts=True)
+    probs = counts / len(y)
+
+    # compute entropy
+    h = - sum(probs * np.log2(probs))
+
+    return h
+
+
 def main():
 
-    # load data & define target variable
-    df = pd.read_csv("playtennis.csv")
-    target = "play"
-
-    tree = DecicionTree.grow(df, target)
-
-    tree.print_bfs()
+    # # load data & define target variable
+    # df = pd.read_csv("playtennis.csv")
+    # target = "play"
+    #
+    # tree = DecicionTree.grow(df, target)
+    # tree.print_bfs()
 
     # test = {"outlook": "sunny",
     #         "temp": "hot",
@@ -157,6 +169,10 @@ def main():
     # result = tree.inference(test)
     # print(result)
 
+    y = np.ones([10,1])
+    y[5:] = 0
+
+    print(entropy(y))
 
 if __name__ == "__main__":
     main()
