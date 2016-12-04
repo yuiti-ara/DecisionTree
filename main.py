@@ -147,7 +147,7 @@ def entropy(y):
         return 0
 
     # compute value distribution
-    probs = y.sum(axis=0) / y.shape[0]
+    probs = y.sum(axis=0) / len(y)
     probs = probs[probs != 0]
 
     # compute entropy
@@ -162,10 +162,10 @@ def info_gain(x, y, limit):
     before = entropy(y)
 
     # divide into two subsets
-    subsets = [y[x <= limit, :], y[x > limit, :]]
+    subsets = y[x <= limit, :], y[x > limit, :]
 
     # compute each weighted entropy
-    entropies = [len(subset) * entropy(subset) for subset in subsets]
+    entropies = (len(subset) * entropy(subset) for subset in subsets)
 
     # compute information gain
     ig = before - sum(entropies) / len(y)
@@ -173,17 +173,25 @@ def info_gain(x, y, limit):
     return ig
 
 
+def intrinsic_value(x, limit):
+
+    # create two indicator columns
+    indicators = np.column_stack([x <= limit, x > limit])
+
+    # compute entropy
+    iv = entropy(indicators)
+
+    return iv
+
+
 def info_gain_ratio(x, y, limit=None):
 
     if not limit:
         limit = x.mean()
 
-    # compute information-gain
+    # compute information-gain & intrinsic value
     ig = info_gain(x, y, limit)
-
-    # compute intrinsic value
-    x = np.column_stack([x <= limit, x > limit])
-    iv = entropy(x)
+    iv = intrinsic_value(x, limit)
 
     # compute ratio
     ratio = ig / iv
@@ -197,10 +205,11 @@ def split_on(X, y):
     if y.ndim == 1:
         return 0
 
-    # list attributes to check
-    indices = (idx for idx in range(X.shape[1]))
+    # list column indices to check
+    _, n = X.shape
+    indices = list(range(n))
 
-    # compute each information-gain
+    # pick column idx with highest information gain
     best = max(indices, key=lambda idx: info_gain_ratio(X[:, idx], y))
 
     return best
