@@ -143,14 +143,67 @@ class DecicionTree:
 
 def entropy(y):
 
+    if not y.size:
+        return 0
+
     # compute value distribution
-    _, counts = np.unique(y, return_counts=True)
-    probs = counts / len(y)
+    probs = y.sum(axis=0) / y.shape[0]
+    probs = probs[probs != 0]
 
     # compute entropy
     h = - sum(probs * np.log2(probs))
 
     return h
+
+
+def info_gain(x, y, limit):
+
+    # compute entropy before
+    before = entropy(y)
+
+    # divide into two subsets
+    subsets = [y[x <= limit, :], y[x > limit, :]]
+
+    # compute each weighted entropy
+    entropies = [len(subset) * entropy(subset) for subset in subsets]
+
+    # compute information gain
+    ig = before - sum(entropies) / len(y)
+
+    return ig
+
+
+def info_gain_ratio(x, y, limit=None):
+
+    if not limit:
+        limit = x.mean()
+
+    # compute information-gain
+    ig = info_gain(x, y, limit)
+
+    # compute intrinsic value
+    x = np.column_stack([x <= limit, x > limit])
+    iv = entropy(x)
+
+    # compute ratio
+    ratio = ig / iv
+
+    return ratio
+
+
+def split_on(X, y):
+
+    # no split if pure subset
+    if y.ndim == 1:
+        return 0
+
+    # list attributes to check
+    indices = (idx for idx in range(X.shape[1]))
+
+    # compute each information-gain
+    best = max(indices, key=lambda idx: info_gain_ratio(X[:, idx], y))
+
+    return best
 
 
 def main():
@@ -169,10 +222,12 @@ def main():
     # result = tree.inference(test)
     # print(result)
 
-    y = np.ones([10,1])
-    y[5:] = 0
+    df = pd.read_csv("iris.csv", index_col=[0])
+    X = df.drop("Species", axis=1).values
+    y = pd.get_dummies(df["Species"]).values
 
-    print(entropy(y))
+    idx = split_on(X, y)
+    print(idx)
 
 if __name__ == "__main__":
     main()
