@@ -3,6 +3,17 @@ import numpy as np
 import pandas as pd
 
 
+def height(root):
+    if not root:
+        return 0
+    else:
+        return max(height(root.left), height(root.right)) + 1
+
+
+def accuracy(predicted, actual):
+    return (predicted == actual) / len(actual)
+
+
 class Tree:
     def __init__(self, y, attr, cutoff):
 
@@ -16,6 +27,20 @@ class Tree:
         # child nodes
         self.left = None
         self.right = None
+
+    def accuracy(self, X, Y):
+
+        # count number of correct predictions
+        hits = 0
+        for (x, y) in zip(X, Y):
+
+            # check most probable class
+            p = self.inference(x)
+            if y[p.argmax()] == 1:
+                hits += 1
+
+        # return frequency of correct predictions
+        return hits / len(Y)
 
     def inference(self, x):
 
@@ -34,120 +59,120 @@ class Tree:
             root = root.left if is_left else root.right
 
 
-def height(root):
+class DecicionTree:
 
-    if not root:
-        return 0
-    else:
-        return max(height(root.left), height(root.right)) + 1
+    @staticmethod
+    def entropy(Y):
 
+        if not Y.size:
+            return 0
 
-def entropy(y):
+        # compute value distribution
+        probs = Y.sum(axis=0) / Y.shape[0]
+        probs = probs[probs != 0]
 
-    if not y.size:
-        return 0
+        # compute entropy
+        h = - sum(probs * np.log2(probs))
 
-    # compute value distribution
-    probs = y.sum(axis=0) / y.shape[0]
-    probs = probs[probs != 0]
+        return h
 
-    # compute entropy
-    h = - sum(probs * np.log2(probs))
+    @classmethod
+    def info_gain(cls, x, Y, cutoff):
 
-    return h
+        # compute entropy before
+        before = cls.entropy(Y)
 
+        # divide into two subsets
+        subset_l = Y[x <= cutoff, :]
+        subset_r = Y[x > cutoff, :]
 
-def info_gain(x, y, cutoff):
+        # compute each weighted entropy
+        h_l = len(subset_l) * cls.entropy(subset_l)
+        h_r = len(subset_r) * cls.entropy(subset_r)
 
-    # compute entropy before
-    before = entropy(y)
+        # compute information gain
+        ig = before - (h_l + h_r) / len(Y)
 
-    # divide into two subsets
-    subset_l = y[x <= cutoff, :]
-    subset_r = y[x > cutoff, :]
+        return ig
 
-    # compute each weighted entropy
-    h_l = len(subset_l) * entropy(subset_l)
-    h_r = len(subset_r) * entropy(subset_r)
+    @classmethod
+    def select_attr(cls, X, Y):
 
-    # compute information gain
-    ig = before - (h_l + h_r) / len(y)
+        # no split if pure subset
+        if len(Y) in Y.sum(axis=0):
+            return None, None
 
-    return ig
+        # list attributes to check
+        attrs = list(range(X.shape[1]))
 
+        # compute information-gain for each (attr, cutoff) combination
+        gains = {}
+        for attr in attrs:
+            for cutoff in X[:, attr]:
 
-def select_attr(X, y):
+                # compute information gain
+                gain = cls.info_gain(X[:, attr], Y, cutoff)
 
-    # no split if pure subset
-    if len(y) in y.sum(axis=0):
+                # store info-gain
+                gains[(attr, cutoff)] = gain
+
+        # pick attr & cutoff with highest info-gain
+        attr, cutoff = max(gains, key=gains.get)
+
+        # return best attribute to split
+        if gains[(attr, cutoff)] > 0:
+            return attr, cutoff
         return None, None
 
-    # list attributes to check
-    attrs = list(range(X.shape[1]))
+    @staticmethod
+    def splits(X, Y, attr, cutoff):
 
-    # compute information-gain for each (attr, cutoff) combination
-    gains = {}
-    for attr in attrs:
-        for cutoff in X[:, attr]:
+        # return empty if no attribute
+        if not attr:
+            return None, None
 
-            # compute information gain
-            gain = info_gain(X[:, attr], y, cutoff)
+        # define boolean idx vector
+        lines = X[:, attr] <= cutoff
 
-            # store info-gain
-            gains[(attr, cutoff)] = gain
+        # divide into two subsets
+        subset_l = X[lines], Y[lines]
+        subset_r = X[~lines], Y[~lines]
 
-    # pick attr & cutoff with highest info-gain
-    attr, cutoff = max(gains, key=gains.get)
+        return subset_l, subset_r
 
-    return attr, cutoff
+    @classmethod
+    def grow(cls, X, Y):
 
+        # pick attribute to split
+        attr, cutoff = cls.select_attr(X, Y)
 
-def splits(X, y, attr, cutoff):
+        # split data into subsets
+        data_l, data_r = cls.splits(X, Y, attr, cutoff)
 
-    # return empty if no attribute
-    if not attr:
-        return None, None
+        # create tree-node
+        root = Tree(Y, attr, cutoff)
 
-    # define boolean idx vector
-    lines = X[:, attr] <= cutoff
+        # add child-nodes
+        root.left = cls.grow(*data_l) if data_l else None
+        root.right = cls.grow(*data_r) if data_r else None
 
-    # divide into two subsets
-    subset_l = X[lines], y[lines]
-    subset_r = X[~lines], y[~lines]
-
-    return subset_l, subset_r
-
-
-def grow(X, y):
-
-    # pick attribute to split
-    attr, cutoff = select_attr(X, y)
-
-    # split data into subsets
-    data_l, data_r = splits(X, y, attr, cutoff)
-
-    # create tree-node
-    root = Tree(y, attr, cutoff)
-
-    # add child-nodes
-    root.left = grow(*data_l) if data_l else None
-    root.right = grow(*data_r) if data_r else None
-
-    return root
+        return root
 
 
 def main():
 
     df = pd.read_csv("data/iris.csv", index_col=[0])
     X = df.drop("Species", axis=1).values
-    y = pd.get_dummies(df["Species"]).values
+    Y = pd.get_dummies(df["Species"]).values
 
     # grow tree
-    tree = grow(X, y)
+    tree = DecicionTree.grow(X, Y)
 
-    # inference
-    for data in zip(X, y):
-        print(tree.inference(data[0]), data[1])
+    # # inference
+    # for data in zip(X, y):
+    #     print(tree.inference(data[0]), data[1])
+
+    print(tree.accuracy(X, Y))
 
 
 if __name__ == "__main__":
