@@ -102,14 +102,14 @@ def select_attr(X, y):
     return attr, cutoff
 
 
-def splits(X, y, attr, limit):
+def splits(X, y, attr, cutoff):
 
     # return empty if no attribute
     if not attr:
         return None, None
 
     # define boolean idx vector
-    lines = X[:, attr] <= limit
+    lines = X[:, attr] <= cutoff
 
     # divide into two subsets
     subset_l = X[lines, :], y[lines]
@@ -145,6 +145,7 @@ def main():
     tree = grow(X, y)
 
     print(height(tree))
+
 
 if __name__ == "__main__":
     main()
