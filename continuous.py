@@ -24,7 +24,7 @@ class Tree:
         while root:
 
             # return distribution if leaf node
-            if not root.nodes:
+            if not root.left and not root.right:
                 return root.probs
 
             # check if attribute value is less of equal than cutoff
@@ -112,8 +112,8 @@ def splits(X, y, attr, cutoff):
     lines = X[:, attr] <= cutoff
 
     # divide into two subsets
-    subset_l = X[lines, :], y[lines]
-    subset_r = X[~lines, :], y[~lines]
+    subset_l = X[lines], y[lines]
+    subset_r = X[~lines], y[~lines]
 
     return subset_l, subset_r
 
@@ -142,9 +142,12 @@ def main():
     X = df.drop("Species", axis=1).values
     y = pd.get_dummies(df["Species"]).values
 
+    # grow tree
     tree = grow(X, y)
 
-    print(height(tree))
+    # inference
+    for data in zip(X, y):
+        print(tree.inference(data[0]), data[1])
 
 
 if __name__ == "__main__":
