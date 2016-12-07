@@ -2,7 +2,7 @@ import pytest
 import numpy as np
 import pandas as pd
 
-from main import (
+from continuous import (
     entropy,
     info_gain,
     info_gain_ratio
@@ -13,7 +13,7 @@ from main import (
 def data():
 
     # load data & format into matrices
-    df = pd.read_csv("iris.csv", index_col=[0])
+    df = pd.read_csv("data/iris.csv", index_col=[0])
     X = df.drop("Species", axis=1).values
     y = pd.get_dummies(df["Species"]).values
 
@@ -28,9 +28,8 @@ def test_entropy(data):
     # pure set
     assert entropy(y[:50]) == 0
 
-    # two classes
+    # two evenly distributed classes
     assert entropy(y[:100]) == 1
 
-    # three classes
+    # three evenly distributed classes
     assert np.isclose(entropy(y), [1.58496250072])
-
