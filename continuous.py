@@ -14,6 +14,17 @@ def accuracy(predicted, actual):
     return (predicted == actual) / len(actual)
 
 
+def numeric(Y):
+
+    # create numeric vector
+    m, n = Y.shape
+    aux = np.zeros([m, 1])
+    for idx in range(n):
+        aux[Y[:, idx] == 1] = idx
+
+    return aux
+
+
 class Tree:
     def __init__(self, y, attr, cutoff):
 
@@ -52,7 +63,7 @@ class Tree:
             if not root.left and not root.right:
                 return root.probs
 
-            # check if attribute value is less of equal than cutoff
+            # check if attribute value is less or equal than cutoff
             is_left = x[root.attr] <= root.cutoff
 
             # go to left child, else right child
