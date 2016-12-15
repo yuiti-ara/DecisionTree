@@ -1,27 +1,26 @@
+import random
+
 # external packages
 import numpy as np
 import pandas as pd
 
 
-def height(root):
-    if not root:
-        return 0
-    return max(height(root.left), height(root.right)) + 1
+class Train:
 
+    @staticmethod
+    def accuracy(predicted, actual):
+        return sum(Train.numeric(predicted) == Train.numeric(actual)) / len(actual)
 
-def accuracy(predicted, actual):
-    return (predicted == actual) / len(actual)
+    @staticmethod
+    def numeric(Y):
 
+        # create numeric vector
+        m, n = Y.shape
+        aux = np.zeros([m, 1])
+        for idx in range(n):
+            aux[Y[:, idx] == 1] = idx
 
-def numeric(Y):
-
-    # create numeric vector
-    m, n = Y.shape
-    aux = np.zeros([m, 1])
-    for idx in range(n):
-        aux[Y[:, idx] == 1] = idx
-
-    return aux
+        return aux
 
 
 class Tree:
@@ -38,21 +37,13 @@ class Tree:
         self.left = None
         self.right = None
 
-    def accuracy(self, X, Y):
+    def predict(self, X):
+        pred = np.zeros([len(X), len(self.probs)])
+        for idx, x in enumerate(X):
+            pred[idx, self._predict(x)] = 1
+        return pred
 
-        # count number of correct predictions
-        hits = 0
-        for (x, y) in zip(X, Y):
-
-            # check most probable class
-            p = self.inference(x)
-            if y[p.argmax()] == 1:
-                hits += 1
-
-        # return frequency of correct predictions
-        return hits / len(Y)
-
-    def inference(self, x):
+    def _predict(self, x):
 
         # walk down the tree
         root = self
@@ -60,13 +51,22 @@ class Tree:
 
             # return distribution if leaf node
             if not root.left and not root.right:
-                return root.probs
+
+                # choose random when tie
+                ps = np.where(root.probs == root.probs.max())
+                p = np.random.choice(*ps)
+                return p
 
             # check if attribute value is less or equal than cutoff
             is_left = x[root.attr] <= root.cutoff
 
             # go to left child, else right child
             root = root.left if is_left else root.right
+
+    def height(self):
+        if not self:
+            return 0
+        return max(Tree.height(self.left), Tree.height(self.right)) + 1
 
 
 class DecicionTree:
@@ -178,12 +178,9 @@ def main():
 
     # grow tree
     tree = DecicionTree.grow(X, Y, max_n=1)
+    y_pred = tree.predict(X)
 
-    # # inference
-    # for data in zip(X, y):
-    #     print(tree.inference(data[0]), data[1])
-
-    print(tree.accuracy(X, Y))
+    print(Train.accuracy(y_pred, Y))
 
 
 if __name__ == "__main__":
