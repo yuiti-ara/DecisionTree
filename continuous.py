@@ -6,8 +6,7 @@ import pandas as pd
 def height(root):
     if not root:
         return 0
-    else:
-        return max(height(root.left), height(root.right)) + 1
+    return max(height(root.left), height(root.right)) + 1
 
 
 def accuracy(predicted, actual):
@@ -107,14 +106,15 @@ class DecicionTree:
         return ig
 
     @classmethod
-    def select_attr(cls, X, Y):
+    def select_attr(cls, X, Y, max_n):
 
         # no split if pure subset
         if len(Y) in Y.sum(axis=0):
             return None, None
 
         # list attributes to check
-        attrs = list(range(X.shape[1]))
+        #attrs = list(range(X.shape[1]))
+        attrs = np.random.choice(X.shape[1], max_n, replace=False)
 
         # compute information-gain for each (attr, cutoff) combination
         gains = {}
@@ -140,44 +140,44 @@ class DecicionTree:
 
         # return empty if no attribute
         if not attr:
-            return None, None
+            return None, None, None, None
 
         # define boolean idx vector
         lines = X[:, attr] <= cutoff
 
-        # divide into two subsets
-        subset_l = X[lines], Y[lines]
-        subset_r = X[~lines], Y[~lines]
-
-        return subset_l, subset_r
+        # return two subsets
+        return X[lines], Y[lines], X[~lines], Y[~lines]
 
     @classmethod
-    def grow(cls, X, Y):
+    def grow(cls, X, Y, max_n):
 
         # pick attribute to split
-        attr, cutoff = cls.select_attr(X, Y)
+        attr, cutoff = cls.select_attr(X, Y, max_n)
 
         # split data into subsets
-        data_l, data_r = cls.splits(X, Y, attr, cutoff)
+        X_l, Y_l, X_r, Y_r = cls.splits(X, Y, attr, cutoff)
 
         # create tree-node
         root = Tree(Y, attr, cutoff)
 
         # add child-nodes
-        root.left = cls.grow(*data_l) if data_l else None
-        root.right = cls.grow(*data_r) if data_r else None
+        if attr:
+            root.left = cls.grow(X_l, Y_l, max_n)
+            root.right = cls.grow(X_r, Y_r, max_n)
 
         return root
 
 
 def main():
 
+    np.random.seed(0)
+
     df = pd.read_csv("data/iris.csv", index_col=[0])
     X = df.drop("Species", axis=1).values
     Y = pd.get_dummies(df["Species"]).values
 
     # grow tree
-    tree = DecicionTree.grow(X, Y)
+    tree = DecicionTree.grow(X, Y, max_n=1)
 
     # # inference
     # for data in zip(X, y):
