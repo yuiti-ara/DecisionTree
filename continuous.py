@@ -1,15 +1,13 @@
-import random
-
 # external packages
 import numpy as np
 import pandas as pd
 
 
-class Train:
+class Metric:
 
     @staticmethod
     def accuracy(predicted, actual):
-        return sum(Train.numeric(predicted) == Train.numeric(actual)) / len(actual)
+        return sum(Metric.numeric(predicted) == Metric.numeric(actual)) / len(actual)
 
     @staticmethod
     def numeric(Y):
@@ -21,6 +19,12 @@ class Train:
             aux[Y[:, idx] == 1] = idx
 
         return aux
+
+    @staticmethod
+    def split_train_test(X, Y, test_size=.2):
+        ts_lines = np.random.choice(len(X), int(test_size*len(X)), replace=False)
+        tr_lines = [line for line in np.arange(len(X)) if line not in ts_lines]
+        return X[tr_lines, :], Y[tr_lines, :], X[ts_lines, :], Y[ts_lines, :]
 
 
 class Tree:
@@ -37,10 +41,21 @@ class Tree:
         self.left = None
         self.right = None
 
-    def predict(self, X):
+    def predict(self, X, dist=False):
+
         pred = np.zeros([len(X), len(self.probs)])
         for idx, x in enumerate(X):
-            pred[idx, self._predict(x)] = 1
+
+            # get probabilities
+            probs = self._predict(x)
+            if dist:
+                pred[idx, :] = probs
+            else:
+                # choose random when tie
+                p_indices = np.where(probs == probs.max())
+                p_idx = np.random.choice(*p_indices)
+                pred[idx, p_idx] = 1
+
         return pred
 
     def _predict(self, x):
@@ -51,11 +66,7 @@ class Tree:
 
             # return distribution if leaf node
             if not root.left and not root.right:
-
-                # choose random when tie
-                ps = np.where(root.probs == root.probs.max())
-                p = np.random.choice(*ps)
-                return p
+                return root.probs
 
             # check if attribute value is less or equal than cutoff
             is_left = x[root.attr] <= root.cutoff
@@ -168,6 +179,62 @@ class DecicionTree:
         return root
 
 
+class Forest:
+
+    def __init__(self, trees):
+        self.trees = trees
+        self.classes = len(trees[0].probs)
+
+    def predict(self, X, dist=False):
+
+        # get avg of all trees
+        pred = np.zeros([len(X), self.classes])
+        for tree in self.trees:
+            pred += tree.predict(X, dist=True)
+        pred /= len(self.trees)
+
+        # return ditribution
+        if dist:
+            return pred
+
+        # return most probable prediction
+        for idx, probs in enumerate(pred):
+
+            # choose most probable column
+            p_indices = np.where(probs == probs.max())
+            p_idx = np.random.choice(*p_indices)
+            pred[idx, :] = 0
+            pred[idx, p_idx] = 1
+
+        return pred
+
+
+class RandomForest:
+
+    @staticmethod
+    def bootstrap(X, Y):
+        # random pick line indices with replacement
+        lines = np.random.choice(len(X), len(X), replace=True)
+        return X[lines, :], Y[lines, :]
+
+    @classmethod
+    def grow(cls, X, Y, n_attrs, n_trees=100):
+
+        trees = []
+        for _ in range(n_trees):
+
+            # bootstrap sample
+            # X_new, Y_new = cls.bootstrap(X, X)
+
+            # grow tree
+            tree = DecicionTree.grow(X, Y, n_attrs)
+
+            # store tree
+            trees.append(tree)
+
+        return Forest(trees)
+
+
 def main():
 
     np.random.seed(0)
@@ -176,12 +243,16 @@ def main():
     X = df.drop("Species", axis=1).values
     Y = pd.get_dummies(df["Species"]).values
 
+    X_tr, Y_tr, X_ts, Y_ts = Metric.split_train_test(X, Y, test_size=.20)
+
     # grow tree
-    tree = DecicionTree.grow(X, Y, max_n=1)
-    y_pred = tree.predict(X)
+    tree = DecicionTree.grow(X_tr, Y_tr, max_n=4)
+    y_pred = tree.predict(X_ts)
+    print(Metric.accuracy(y_pred, Y_ts))
 
-    print(Train.accuracy(y_pred, Y))
-
+    forest = RandomForest.grow(X_tr, Y_tr, n_attrs=1, n_trees=100)
+    y_pred = forest.predict(X_ts)
+    print(Metric.accuracy(y_pred, Y_ts))
 
 if __name__ == "__main__":
     main()
