@@ -30,11 +30,11 @@ class Metric:
 class Tree:
     def __init__(self, y, attr, cutoff):
 
-        # target attribute distribution
+        # class distribution
         self.probs = y.sum(axis=0) / len(y)
 
         # decision attribute & decision value
-        self.attr = attr if attr else "pure"
+        self.attr = attr
         self.cutoff = cutoff
 
         # child nodes
@@ -43,18 +43,18 @@ class Tree:
 
     def predict(self, X, dist=False):
 
-        pred = np.zeros([len(X), len(self.probs)])
+        # create prediction matrix
+        shape = [len(X), len(self.probs)]
+        pred = np.zeros(shape)
+
+        # fill prediction matrix
         for idx, x in enumerate(X):
 
             # get probabilities
             probs = self._predict(x)
-            if dist:
-                pred[idx, :] = probs
-            else:
-                # choose random when tie
-                p_indices = np.where(probs == probs.max())
-                p_idx = np.random.choice(*p_indices)
-                pred[idx, p_idx] = 1
+
+            # set distrubution
+            pred[idx, :] = self.hot_encode(probs) if not dist else probs
 
         return pred
 
@@ -65,7 +65,7 @@ class Tree:
         while root:
 
             # return distribution if leaf node
-            if not root.left and not root.right:
+            if not root.attr:
                 return root.probs
 
             # check if attribute value is less or equal than cutoff
@@ -73,6 +73,21 @@ class Tree:
 
             # go to left child, else right child
             root = root.left if is_left else root.right
+
+    @staticmethod
+    def hot_encode(probs):
+
+        # pick all idx with highest value
+        indices = np.where(probs == probs.max())
+
+        # choose one
+        idx = np.random.choice(*indices)
+
+        # create hot-encoded vector
+        hot = np.zeros(probs.shape)
+        hot[idx] = 1
+
+        return hot
 
     def height(self):
         if not self:
@@ -117,15 +132,7 @@ class DecicionTree:
         return ig
 
     @classmethod
-    def select_attr(cls, X, Y, max_n):
-
-        # no split if pure subset
-        if len(Y) in Y.sum(axis=0):
-            return None, None
-
-        # list attributes to check
-        #attrs = list(range(X.shape[1]))
-        attrs = np.random.choice(X.shape[1], max_n, replace=False)
+    def _select_attr(cls, X, Y, attrs):
 
         # compute information-gain for each (attr, cutoff) combination
         gains = {}
@@ -142,9 +149,31 @@ class DecicionTree:
         attr, cutoff = max(gains, key=gains.get)
 
         # return best attribute to split
-        if gains[(attr, cutoff)] > 0:
-            return attr, cutoff
-        return None, None
+        return attr, cutoff, gains[(attr, cutoff)]
+
+    @classmethod
+    def select_attr(cls, X, Y, n_attrs):
+
+        # check for single instance
+        if len(X) <= 1:
+            return None, None
+
+        # check for pure subset
+        if len(Y) in Y.sum(axis=0):
+            return None, None
+
+        # pick attributes to check
+        attrs = np.random.choice(X.shape[1], n_attrs, replace=False)
+
+        # pick best attribute to split
+        attr, cutoff, gain = cls._select_attr(X, Y, attrs)
+
+        # check for relevant gain
+        if np.around(gain, 6) <= 0:
+            return None, None
+
+        # return best split
+        return attr, cutoff
 
     @staticmethod
     def splits(X, Y, attr, cutoff):
@@ -160,21 +189,21 @@ class DecicionTree:
         return X[lines], Y[lines], X[~lines], Y[~lines]
 
     @classmethod
-    def grow(cls, X, Y, max_n):
+    def grow(cls, X, Y, n_attrs):
 
         # pick attribute to split
-        attr, cutoff = cls.select_attr(X, Y, max_n)
+        attr, cutoff = cls.select_attr(X, Y, n_attrs)
 
         # split data into subsets
         X_l, Y_l, X_r, Y_r = cls.splits(X, Y, attr, cutoff)
 
-        # create tree-node
+        # grow root node
         root = Tree(Y, attr, cutoff)
 
-        # add child-nodes
+        # grow child-nodes
         if attr:
-            root.left = cls.grow(X_l, Y_l, max_n)
-            root.right = cls.grow(X_r, Y_r, max_n)
+            root.left = cls.grow(X_l, Y_l, n_attrs)
+            root.right = cls.grow(X_r, Y_r, n_attrs)
 
         return root
 
@@ -197,7 +226,7 @@ class Forest:
         if dist:
             return pred
 
-        # return most probable prediction
+        # return hot encoded
         for idx, probs in enumerate(pred):
 
             # choose most probable column
@@ -218,16 +247,20 @@ class RandomForest:
         return X[lines, :], Y[lines, :]
 
     @classmethod
-    def grow(cls, X, Y, n_attrs, n_trees=100):
+    def grow(cls, X, Y, n_trees=100, n_attrs=None):
+
+        # default number of attributes
+        if not n_attrs:
+            n_attrs = int(np.sqrt(X.shape[1]))
 
         trees = []
         for _ in range(n_trees):
 
             # bootstrap sample
-            # X_new, Y_new = cls.bootstrap(X, X)
+            X_boot, Y_boot = cls.bootstrap(X, Y)
 
             # grow tree
-            tree = DecicionTree.grow(X, Y, n_attrs)
+            tree = DecicionTree.grow(X_boot, Y_boot, n_attrs)
 
             # store tree
             trees.append(tree)
@@ -237,20 +270,24 @@ class RandomForest:
 
 def main():
 
+    # seed rng
     np.random.seed(0)
 
+    # load data
     df = pd.read_csv("data/iris.csv", index_col=[0])
     X = df.drop("Species", axis=1).values
     Y = pd.get_dummies(df["Species"]).values
 
-    X_tr, Y_tr, X_ts, Y_ts = Metric.split_train_test(X, Y, test_size=.20)
+    # split data
+    X_tr, Y_tr, X_ts, Y_ts = Metric.split_train_test(X, Y, test_size=.25)
 
     # grow tree
-    tree = DecicionTree.grow(X_tr, Y_tr, max_n=4)
+    tree = DecicionTree.grow(X_tr, Y_tr, n_attrs=4)
     y_pred = tree.predict(X_ts)
     print(Metric.accuracy(y_pred, Y_ts))
 
-    forest = RandomForest.grow(X_tr, Y_tr, n_attrs=1, n_trees=100)
+    # grow forest
+    forest = RandomForest.grow(X_tr, Y_tr)
     y_pred = forest.predict(X_ts)
     print(Metric.accuracy(y_pred, Y_ts))
 
