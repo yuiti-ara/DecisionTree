@@ -27,7 +27,7 @@ def split_train_test(X, Y, test_size=.2):
 
 
 def load_data():
-    df = pd.read_csv('/home/yuiti/PycharmProjects/RandomForest/data/iris.csv', index_col=[0])
+    df = pd.read_csv('data/iris.csv', index_col=[0])
     cols = ['Sepal.Length','Sepal.Width','Petal.Length','Petal.Width']
     df_X, df_Y = df[cols], pd.get_dummies(df['Species'])
     X, Y = df_X.values, df_Y.values
@@ -35,7 +35,7 @@ def load_data():
 
 
 def load_data_categorical():
-    df = pd.read_csv('/home/yuiti/PycharmProjects/RandomForest/data/playtennis.csv')
+    df = pd.read_csv('data/playtennis.csv')
     target = 'play'
     test = {
         'outlook': 'sunny',
@@ -66,4 +66,4 @@ if __name__ == '__main__':
     df, attr_targe, record_test = load_data_categorical()
     tree = DecicionTreeCategorical()
     tree.fit(df, attr_targe)
-    print(tree.predict_one(record_test))
+    assert tree.predict_one(record_test) == {'yes': 1.0}
