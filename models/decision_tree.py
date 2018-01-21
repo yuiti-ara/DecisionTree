@@ -1,36 +1,11 @@
 import numpy as np
-import pandas as pd
-
-
-np.random.seed(0)
-
-
-def accuracy(predicted, actual):
-    return sum(numeric(predicted) == numeric(actual)) / len(actual)
-
-
-def numeric(Y):
-
-    # create numeric vector
-    m, n = Y.shape
-    aux = np.zeros([m, 1])
-    for idx in range(n):
-        aux[Y[:, idx] == 1] = idx
-
-    return aux
-
-
-def split_train_test(X, Y, test_size=.2):
-    ts_lines = np.random.choice(len(X), int(test_size*len(X)), replace=False)
-    tr_lines = [line for line in np.arange(len(X)) if line not in ts_lines]
-    return X[tr_lines, :], Y[tr_lines, :], X[ts_lines, :], Y[ts_lines, :]
 
 
 class Tree:
     def __init__(self, y, attr, cutoff):
 
         # class distribution
-        self.probs = y.sum(axis=0) / len(y)
+        self.probs = np.sum(y, axis=0) / len(y)
 
         # decision attribute & decision value
         self.attr = attr
@@ -40,11 +15,11 @@ class Tree:
         self.left = None
         self.right = None
 
-    def predict(self, X, dist=False):
+    def predict(self, X, output_prob=False):
 
         # create prediction matrix
-        shape = [len(X), len(self.probs)]
-        pred = np.zeros(shape)
+        m, n = len(X), len(self.probs)
+        pred = np.zeros([m, n])
 
         # fill prediction matrix
         for idx, x in enumerate(X):
@@ -52,10 +27,28 @@ class Tree:
             # get probabilities
             probs = self._predict(x)
 
-            # set distrubution
-            pred[idx, :] = self.hot_encode(probs) if not dist else probs
+            if output_prob:
+                probs = self.hot_encode(probs)
+
+            # set distribution
+            pred[idx, :] = probs
 
         return pred
+
+    @staticmethod
+    def hot_encode(probs):
+
+        # pick all idx with highest value
+        indices = np.where(probs == np.max(probs))
+
+        # choose one
+        idx = np.random.choice(*indices)
+
+        # create hot-encoded vector
+        hot = np.zeros(probs.shape)
+        hot[idx] = 1
+
+        return hot
 
     def _predict(self, x):
 
@@ -73,28 +66,14 @@ class Tree:
             # go to left child, else right child
             root = root.left if is_left else root.right
 
-    @staticmethod
-    def hot_encode(probs):
-
-        # pick all idx with highest value
-        indices = np.where(probs == probs.max())
-
-        # choose one
-        idx = np.random.choice(*indices)
-
-        # create hot-encoded vector
-        hot = np.zeros(probs.shape)
-        hot[idx] = 1
-
-        return hot
-
-    def height(self):
-        if not self:
-            return 0
-        return max(Tree.height(self.left), Tree.height(self.right)) + 1
+        raise ValueError
 
 
 class DecisionTree:
+
+    def __init__(self, n_attrs=None):
+        self.n_attrs = n_attrs
+        self.tree = None
 
     @staticmethod
     def entropy(Y):
@@ -155,7 +134,7 @@ class DecisionTree:
             return None, None
 
         # check for pure subset
-        if len(Y) in Y.sum(axis=0):
+        if len(Y) in np.sum(Y, axis=0):
             return None, None
 
         # pick attributes to check
@@ -165,14 +144,14 @@ class DecisionTree:
         attr, cutoff, gain = self._select_attr(X, Y, attrs)
 
         # check for relevant gain
-        if np.around(gain, 6) <= 0:
+        if np.around(gain, decimals=6) <= 0:
             return None, None
 
         # return best split
         return attr, cutoff
 
     @staticmethod
-    def splits(X, Y, attr, cutoff):
+    def split(X, Y, attr, cutoff):
 
         # return empty if no attribute
         if not attr:
@@ -190,7 +169,7 @@ class DecisionTree:
         attr, cutoff = self.select_attr(X, Y, n_attrs)
 
         # split data into subsets
-        X_l, Y_l, X_r, Y_r = self.splits(X, Y, attr, cutoff)
+        X_l, Y_l, X_r, Y_r = self.split(X, Y, attr, cutoff)
 
         # grow root node
         node = Tree(Y, attr, cutoff)
@@ -202,23 +181,13 @@ class DecisionTree:
 
         return node
 
+    def fit(self, X, Y):
 
-if __name__ == '__main__':
+        # number of attributes to choose from when spliting
+        n_attrs = self.n_attrs or X.shape[1]
 
-    # load data
-    df = pd.read_csv('/home/yuiti/PycharmProjects/RandomForest/data/iris.csv', index_col=[0])
-    cols = ['Sepal.Length','Sepal.Width','Petal.Length','Petal.Width']
-    df_X, df_Y = df[cols], pd.get_dummies(df['Species'])
-    X, Y = df_X.values, df_Y.values
+        # fit decision tree
+        self.tree = self.grow(X, Y, n_attrs)
 
-    # split data
-    X_tr, Y_tr, X_ts, Y_ts = split_train_test(X, Y, test_size=.25)
-
-    # grow tree
-    model = DecisionTree()
-    tree = model.grow(X_tr, Y_tr, n_attrs=4)
-    y_pred = tree.predict(X_ts)
-
-    acc = accuracy(y_pred, Y_ts)
-    print(acc)
-    assert float(acc) == 0.8918918918918919
+    def predict(self, X, output_probs=False):
+        return self.tree.predict(X, output_probs)
