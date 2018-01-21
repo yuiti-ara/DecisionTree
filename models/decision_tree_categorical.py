@@ -1,8 +1,6 @@
 from collections import deque
 import math
 
-import pandas as pd
-
 
 class Tree:
     def __init__(self, series, attr):
